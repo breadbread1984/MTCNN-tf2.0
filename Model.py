@@ -46,6 +46,9 @@ def ONet():
 
 class MTCNN(tf.keras.Model):
 
+  STRIDE = 2.0;
+  CELLSIZE = 12.0;
+
   def __init__(self, minsize = 20, threshold = [0.6, 0.7, 0.7], factor = 0.709):
 
     super(MTCNN, self).__init__();
@@ -64,16 +67,45 @@ class MTCNN(tf.keras.Model):
 
   def getBBox(self, outputs, probs, scale):
 
-    dx1,dy1,dx2,dy2 = tf.unstack(outputs, axis = -1);
-    pos = tf.where(tf.math.greater_equal(outputs, self.threshold[0]));
-    # TODO:
+    boxes_batch = list();
+    reg_batch = list();
+    for b in tf.range(output.shape[0]):
+      # positions of targets over threshold
+      # pos.shape = (target num, 2)
+      pos = tf.where(tf.math.greater_equal(probs[b,...], self.threshold[0]));
+      # pick the anchor box of targets over threshold
+      # shape = (target num, 2)
+      upper_left = tf.math.round((pos * self.STRIDE + 1) / scale);
+      down_right = tf.math.round((pos * self.STRIDE + self.CELLSIZE - 1 + 1) / scale);
+      # pick the score of tartgets over threshold
+      # score.shape = (target num,)
+      score = tf.gather_nd(probs[b,...], pos);
+      # pick the regressed deviation of targets over threshold
+      # reg.shape = (target num, 4)
+      reg = tf.gather_nd(outputs[b,...], pos);
+      # boxes.shape = (target num, 5)
+      boxes = tf.concat([upper_left, down_right, tf.expand_dims(score, -1)], axis = -1);
+      boxes_batch.append(boxes);
+      reg_batch.append(reg);
+    return boxes_batch, reg_batch;
+
+  def nms(self, boxes_batch, threshold, method):
+
+    for boxes in boxes_batch:
+      down_right = boxes[...,2:4];
+      upper_left = boxes[...,0:2];
+      # hw.shape = (target num, 2)
+      hw = down_right - upper_left + tf.ones((1,2,));
+      # area.shape = (target num,)
+      area = hw[...,0] * hw[...,1];
+      # TODO
 
   def call(self, inputs):
 
     imgs = tf.cast(inputs, dtype = tf.float32);
     # generate image pyramid scales
-    m = (12.0 / self.minsize) * tf.math.reduce_min(inputs.shape[1:3]);
-    scale = (12.0 / self.minsize);
+    m = (self.CELLSIZE / self.minsize) * tf.math.reduce_min(inputs.shape[1:3]);
+    scale = (self.CELLSIZE / self.minsize);
     scales = list();
     while m >= 12:
       scales.append(scale);
@@ -84,7 +116,9 @@ class MTCNN(tf.keras.Model):
       sz = tf.math.ceil(inputs.shape[1:3] * scale);
       imgs = (tf.image.resize(inputs, sz) - 127.5) / 128.0;
       probs, outputs = self.pnet(imgs);
-      bbox = self.getBBox(outputs, probs, scale);
+      # channel-1 of probs represents is a face.
+      boxes_batch, _ = self.getBBox(outputs, probs[...,1], scale);
+
 
 if __name__ == "__main__":
 
