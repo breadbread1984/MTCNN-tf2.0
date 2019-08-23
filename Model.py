@@ -91,7 +91,7 @@ class MTCNN(tf.keras.Model):
 
   def nms(self, boxes_batch, threshold = 0.5, method = 'union'):
 
-    box_indices = list();
+    indices_batch = list();
     for boxes in boxes_batch:
       down_right = boxes[...,2:4];
       upper_left = boxes[...,0:2];
@@ -105,14 +105,14 @@ class MTCNN(tf.keras.Model):
       while i < descend_idx.shape[0]:
         # idx = ()
         idx = descend_idx[i];
-        # following_idx.shape = (following number,)
-        following_idx = descend_idx[i + 1:];
         # cur_xxx.shape = (1, 2)
         cur_upper_left = upper_left[idx:idx + 1, ...];
         cur_down_right = down_right[idx:idx + 1, ...];
         # area.shape = (1,)
         hw = cur_down_right - cur_upper_left + tf.ones((1, 2), dtype = tf.float32);
         area = hw[0] * hw[1];
+        # following_idx.shape = (following number,)
+        following_idx = descend_idx[i + 1:];
         # following_xxx.shape = (following number, 2)
         following_upper_left = tf.gather_nd(upper_left, following_idx);
         following_down_right = tf.gather_nd(down_right, following_idx);
@@ -138,8 +138,8 @@ class MTCNN(tf.keras.Model):
         following_idx = tf.gather(following_idx, indices);
         descend_idx = tf.concat([descend_idx[:i], following_idx], axis = -1);
         i += 1;
-      box_indices.append(descend_idx);
-    return box_indices;
+      indices_batch.append(descend_idx);
+    return indices_batch;
 
   def call(self, inputs):
 
@@ -152,6 +152,7 @@ class MTCNN(tf.keras.Model):
       scales.append(scale);
       scale = scale * self.factor;
       m = m * self.factor;
+    total_boxes = [tf.zeros((0,5), dtype = tf.float32) for i in tf.range(imgs.shape[0])];
     # first stage
     for scale in scales:
       sz = tf.math.ceil(inputs.shape[1:3] * scale);
@@ -159,8 +160,18 @@ class MTCNN(tf.keras.Model):
       probs, outputs = self.pnet(imgs);
       # channel-1 of probs represents is a face.
       boxes_batch, _ = self.getBBox(outputs, probs[...,1], scale);
-      boxes_indices = self.nms(boxes_batch, 0.5, 'union');
+      indices_batch = self.nms(boxes_batch, 0.5, 'union');
+      for b in tf.range(boxes_batch.shape[0]):
+        boxes = boxes_batch[b];
+        indices = indices_batch[b];
+        total_boxes[b] = tf.concat([total_boxes[b], tf.gather(boxes, indices)], axis = 0);
+    # second stage
+    indices_batch = self.nms(total_boxes, 0.7, 'union');
+    for b in tf.range(indices_batch.shape[0]):
+      boxes = total_boxes[b];
+      indices = indices_batch[b];
       
+    # TODO
 
 if __name__ == "__main__":
 
