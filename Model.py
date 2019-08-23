@@ -89,8 +89,9 @@ class MTCNN(tf.keras.Model):
       reg_batch.append(reg);
     return boxes_batch, reg_batch;
 
-  def nms(self, boxes_batch, threshold, method):
+  def nms(self, boxes_batch, threshold = 0.5, method = 'union'):
 
+    box_indices = list();
     for boxes in boxes_batch:
       down_right = boxes[...,2:4];
       upper_left = boxes[...,0:2];
@@ -98,7 +99,47 @@ class MTCNN(tf.keras.Model):
       hw = down_right - upper_left + tf.ones((1,2,));
       # area.shape = (target num,)
       area = hw[...,0] * hw[...,1];
-      # TODO
+      # sort with respect to weight in descend order.
+      descend_idx = tf.argsort(boxes[...,4], direction = 'DESCENDING');
+      i = 0;
+      while i < descend_idx.shape[0]:
+        # idx = ()
+        idx = descend_idx[i];
+        # following_idx.shape = (following number,)
+        following_idx = descend_idx[i + 1:];
+        # cur_xxx.shape = (1, 2)
+        cur_upper_left = upper_left[idx:idx + 1, ...];
+        cur_down_right = down_right[idx:idx + 1, ...];
+        # area.shape = (1,)
+        hw = cur_down_right - cur_upper_left + tf.ones((1, 2), dtype = tf.float32);
+        area = hw[0] * hw[1];
+        # following_xxx.shape = (following number, 2)
+        following_upper_left = tf.gather_nd(upper_left, following_idx);
+        following_down_right = tf.gather_nd(down_right, following_idx);
+        # following_area.shape = (following number,)
+        following_hw = following_down_right - following_upper_left + tf.ones((1,2), dtype = tf.float32);
+        following_area = following_hw[0] * following_hw[1];
+        # intersect_hw.shape = (following number, 2)
+        # negative means no intersection.
+        max_upper_left = tf.math.maximum(cur_upper_left, following_upper_left);
+        min_down_right = tf.math.minimum(cur_upper_left, following_down_right);
+        intersect_hw = min_down_right - max_upper_left + tf.ones((1, 2), dtype = tf.float32);
+        # intersect_area.shape = (following number)
+        intersect_hw = tf.where(tf.math.greater(intersect_hw, 0), intersect_hw, tf.zeros_like(intersect_hw));
+        intersect_area = intersect_hw[..., 0] * intersect_hw[..., 1];
+        # overlap rate
+        if method.lower() is 'min':
+          overlap = intersect_area / tf.math.minimum(area, following_area);
+        elif method.lower() is 'union':
+          overlap = intersect_area / (area + following_area - intersect_area);
+        else: raise Exception('unknown overlap method!');
+        # pick following idx with overlap lower than given one.
+        indices = tf.where(tf.less(overlap, threshold));
+        following_idx = tf.gather(following_idx, indices);
+        descend_idx = tf.concat([descend_idx[:i], following_idx], axis = -1);
+        i += 1;
+      box_indices.append(descend_idx);
+    return box_indices;
 
   def call(self, inputs):
 
@@ -118,7 +159,8 @@ class MTCNN(tf.keras.Model):
       probs, outputs = self.pnet(imgs);
       # channel-1 of probs represents is a face.
       boxes_batch, _ = self.getBBox(outputs, probs[...,1], scale);
-
+      boxes_indices = self.nms(boxes_batch, 0.5, 'union');
+      
 
 if __name__ == "__main__":
 
