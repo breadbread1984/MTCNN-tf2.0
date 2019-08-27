@@ -96,7 +96,7 @@ class MTCNN(tf.keras.Model):
       down_right = boxes[...,2:4];
       upper_left = boxes[...,0:2];
       # hw.shape = (target num, 2)
-      hw = down_right - upper_left + tf.ones((1,2,));
+      hw = down_right - upper_left + tf.ones((1, 2,), dtype = tf.float32);
       # area.shape = (target num,)
       area = hw[...,0] * hw[...,1];
       # sort with respect to weight in descend order.
@@ -109,15 +109,15 @@ class MTCNN(tf.keras.Model):
         cur_upper_left = upper_left[idx:idx + 1, ...];
         cur_down_right = down_right[idx:idx + 1, ...];
         # area.shape = (1,)
-        hw = cur_down_right - cur_upper_left + tf.ones((1, 2), dtype = tf.float32);
+        hw = cur_down_right - cur_upper_left + tf.ones((1, 2,), dtype = tf.float32);
         area = hw[0] * hw[1];
-        # following_idx.shape = (following number,)
+        # following_idx.shape = (following number, 1)
         following_idx = descend_idx[i + 1:];
         # following_xxx.shape = (following number, 2)
-        following_upper_left = tf.gather_nd(upper_left, following_idx);
-        following_down_right = tf.gather_nd(down_right, following_idx);
+        following_upper_left = tf.gather(upper_left, following_idx);
+        following_down_right = tf.gather(down_right, following_idx);
         # following_area.shape = (following number,)
-        following_hw = following_down_right - following_upper_left + tf.ones((1,2), dtype = tf.float32);
+        following_hw = following_down_right - following_upper_left + tf.ones((1, 2,), dtype = tf.float32);
         following_area = following_hw[0] * following_hw[1];
         # intersect_hw.shape = (following number, 2)
         # negative means no intersection.
@@ -178,7 +178,7 @@ class MTCNN(tf.keras.Model):
     m = (self.CELLSIZE / self.minsize) * tf.math.reduce_min(inputs.shape[1:3]);
     scale = (self.CELLSIZE / self.minsize);
     scales = list();
-    while m >= 12:
+    while m >= self.CELLSIZE:
       scales.append(scale);
       scale = scale * self.factor;
       m = m * self.factor;
@@ -201,7 +201,7 @@ class MTCNN(tf.keras.Model):
     for b in tf.range(len(total_boxes)):
       boxes = total_boxes[b];
       indices = indices_batch[b];
-      boxes = tf.gather_nd(boxes, indices);
+      boxes = tf.gather(boxes, indices);
       # hw.shape = (target number, 2)
       hw = boxes[..., 2:4] - boxes[..., 0:2];
       # bounding.shape = (target number, 4 (bounding) + 1 (objectness))
@@ -220,7 +220,7 @@ class MTCNN(tf.keras.Model):
       img = inputs[b:b+1,...];
       # crop target and resize
       target_imgs = tf.image.crop_and_resize(img, boxes[...,0:4], tf.zeros((boxes.shape[0]), dtype = tf.int32), (24,24));
-      target_imgs = (target_imgs - 127.5) / 128;
+      target_imgs = (target_imgs - 127.5) / 128.0;
       probs, deviations = self.rnet(target_imgs);
       valid_indices = tf.where(tf.math.greater(probs[...,1], self.threshold[1]));
       boxes = tf.gather_nd(boxes, valid_indices);
@@ -232,7 +232,7 @@ class MTCNN(tf.keras.Model):
       boxes = total_boxes[b][0];
       deviations = total_boxes[b][1];
       indices = indices_batch[b];
-      boxes = tf.gather_nd(boxes, indices);
+      boxes = tf.gather(boxes, indices);
       deviations = tf.gather_nd(deviations, indices);
       boxes = self.applyDeviation(boxes, deviations);
       boxes = self.toSquare(boxes);
@@ -244,13 +244,13 @@ class MTCNN(tf.keras.Model):
       img = inputs[b:b+1,...];
       # crop target and resize
       target_imgs = tf.image.crop_and_resize(img, boxes[...,0:4], tf.zeros((boxes.shape[0]), dtype = tf.int32), (48,48));
-      target_imgs = (target_imgs - 127.5) / 128;
+      target_imgs = (target_imgs - 127.5) / 128.0;
       probs, deviations, points = self.onet(target_imgs);
       valid_indices = tf.where(tf.math.greater(probs[...,1], self.threshold[2]));
-      boxes = tf.gather_nd(boxes, valid_indices);
-      scores = tf.gather_nd(probs[...,1:2], valid_indices);
-      deviations = tf.gather_nd(deviations, valid_indices);
-      points = tf.gather_nd(points, valid_indices);
+      boxes = tf.gather(boxes, valid_indices);
+      scores = tf.gather(probs[...,1:2], valid_indices);
+      deviations = tf.gather(deviations, valid_indices);
+      points = tf.gather(points, valid_indices);
       # convert points from relative coordinate to absolute coordinate
       hw = boxes[...,2:4] - boxes[...,0:2];
       # absolute coordinate.h = relative coordinate.h * h + upper_left.y
