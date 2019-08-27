@@ -68,7 +68,6 @@ class MTCNN(tf.keras.Model):
   def getBBox(self, outputs, probs, scale):
 
     boxes_batch = list();
-    reg_batch = list();
     for b in tf.range(output.shape[0]):
       # positions of targets over threshold
       # pos.shape = (target num, 2)
@@ -83,11 +82,11 @@ class MTCNN(tf.keras.Model):
       # pick the regressed deviation of targets over threshold
       # reg.shape = (target num, 4)
       reg = tf.gather_nd(outputs[b,...], pos);
-      # boxes.shape = (target num, 5)
-      boxes = tf.concat([upper_left, down_right, tf.expand_dims(score, -1)], axis = -1);
+      # boxes.shape = (target num, 9)
+      boxes = tf.concat([upper_left, down_right, tf.expand_dims(score, -1), reg], axis = -1);
       boxes_batch.append(boxes);
-      reg_batch.append(reg);
-    return boxes_batch, reg_batch;
+    # boxes_batch.shape = batch * (target num, 4 (anchorbox pos) + 1 (objectness) + 4 (regressed deviation))
+    return boxes_batch;
 
   def nms(self, boxes_batch, threshold = 0.5, method = 'union'):
 
@@ -152,14 +151,14 @@ class MTCNN(tf.keras.Model):
       scales.append(scale);
       scale = scale * self.factor;
       m = m * self.factor;
-    total_boxes = [tf.zeros((0,5), dtype = tf.float32) for i in tf.range(imgs.shape[0])];
     # first stage
+    total_boxes = [tf.zeros((0,9), dtype = tf.float32) for i in tf.range(imgs.shape[0])];
     for scale in scales:
       sz = tf.math.ceil(inputs.shape[1:3] * scale);
       imgs = (tf.image.resize(inputs, sz) - 127.5) / 128.0;
       probs, outputs = self.pnet(imgs);
       # channel-1 of probs represents is a face.
-      boxes_batch, _ = self.getBBox(outputs, probs[...,1], scale);
+      boxes_batch = self.getBBox(outputs, probs[...,1], scale);
       indices_batch = self.nms(boxes_batch, 0.5, 'union');
       for b in tf.range(boxes_batch.shape[0]):
         boxes = boxes_batch[b];
@@ -170,7 +169,14 @@ class MTCNN(tf.keras.Model):
     for b in tf.range(indices_batch.shape[0]):
       boxes = total_boxes[b];
       indices = indices_batch[b];
-      
+      boxes = tf.gather(boxes, indices);
+      # hw.shape = (target number, 2)
+      hw = boxes[..., 2:4] - boxes[..., 0:2];
+      # bounding.shape = (target number, 4 (bounding) + 1 (objectness))
+      bounding = boxes[...., 0:4] + tf.concat([hw[..., 0:2],hw[..., 0:2]],axis = -1) * boxes[..., 5:9];
+      bounding = tf.concat([bounding, boxes[..., 4]], axis = -1);
+      # refined_total_boxes.shape = batch * (target number, 5)
+      total_boxes[b] = bounding;
     # TODO
 
 if __name__ == "__main__":
