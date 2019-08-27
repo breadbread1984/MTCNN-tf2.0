@@ -202,14 +202,8 @@ class MTCNN(tf.keras.Model):
       boxes = total_boxes[b];
       indices = indices_batch[b];
       boxes = tf.gather(boxes, indices);
-      # hw.shape = (target number, 2)
-      hw = boxes[..., 2:4] - boxes[..., 0:2];
-      # bounding.shape = (target number, 4 (bounding) + 1 (objectness))
-      bounding = boxes[...., 0:4] + tf.concat([hw[..., 0:2],hw[..., 0:2]],axis = -1) * boxes[..., 5:9];
-      bounding = tf.concat([bounding, boxes[..., 4]], axis = -1);
-      # from rectangle bounding to square bounding
+      bounding = self.applyDeviation(boxes, boxes[..., 5:9]);
       bounding = self.toSquare(bounding);
-      # clip the bounding within image
       bounding = self.clip(bounding, inputs.shape);
       # total_boxes.shape = batch * (target number, 5)
       total_boxes[b] = bounding;
@@ -219,13 +213,13 @@ class MTCNN(tf.keras.Model):
       boxes = total_boxes[b];
       img = inputs[b:b+1,...];
       # crop target and resize
-      target_imgs = tf.image.crop_and_resize(img, boxes[...,0:4], tf.zeros((boxes.shape[0]), dtype = tf.int32), (24,24));
+      target_imgs = tf.image.crop_and_resize(img, boxes[...,0: 4], tf.zeros((boxes.shape[0]), dtype = tf.int32), (24, 24));
       target_imgs = (target_imgs - 127.5) / 128.0;
       probs, deviations = self.rnet(target_imgs);
       valid_indices = tf.where(tf.math.greater(probs[...,1], self.threshold[1]));
-      boxes = tf.gather_nd(boxes, valid_indices);
-      scores = tf.gather_nd(probs[...,1:2], valid_indices);
-      deviations = tf.gather_nd(deviations, valid_indices);
+      boxes = tf.gather(boxes, valid_indices);
+      scores = tf.gather(probs[...,1:2], valid_indices);
+      deviations = tf.gather(deviations, valid_indices);
       total_boxes[b] = (tf.concat([boxes[..., 0:4], scores], axis = -1), deviations);
     indices_batch = self.nms(total_boxes, 0.7, 'union');
     for b in tf.range(len(total_boxes)):
@@ -233,7 +227,7 @@ class MTCNN(tf.keras.Model):
       deviations = total_boxes[b][1];
       indices = indices_batch[b];
       boxes = tf.gather(boxes, indices);
-      deviations = tf.gather_nd(deviations, indices);
+      deviations = tf.gather(deviations, indices);
       boxes = self.applyDeviation(boxes, deviations);
       boxes = self.toSquare(boxes);
       boxes = self.clip(boxes);
