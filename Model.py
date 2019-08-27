@@ -163,6 +163,13 @@ class MTCNN(tf.keras.Model):
     total_boxes = tf.concat([boxes, total_boxes[...,4:5]], axis = -1);
     return total_boxes;
 
+  def applyDeviation(self, boxes, outputs):
+
+    hw = boxes[...,2:4] - boxes[...,0:2];
+    pos = boxes[...,0:4] + outputs * tf.concat([hw,hw], axis = -1);
+    boxes = tf.concat([pos, boxes[...,4:5]], axis = -1);
+    return boxes;
+
   def call(self, inputs):
 
     imgs = tf.cast(inputs, dtype = tf.float32);
@@ -217,12 +224,33 @@ class MTCNN(tf.keras.Model):
       valid_indices = tf.where(tf.math.greater(probs[...,1], self.threshold[1]));
       boxes = tf.gather_nd(boxes, valid_indices);
       scores = tf.gather_nd(probs[...,1], valid_indices);
-      total_boxes[b] = tf.concat([boxes[..., 0:4], scores], axis = -1);
+      outputs = tf.gather_nd(outputs, valid_indices);
+      total_boxes[b] = (tf.concat([boxes[..., 0:4], scores], axis = -1), outputs);
     indices_batch = self.nms(total_boxes, 0.7, 'union');
     for b in tf.range(len(total_boxes)):
-      boxes = total_boxes[b];
+      boxes = total_boxes[b][0];
+      outputs = total_boxes[b][1];
       indices = indices_batch[b];
       boxes = tf.gather_nd(boxes, indices);
+      outputs = tf.gather_nd(outputs, indices);
+      boxes = self.applyDeviation(boxes, outputs);
+      boxes = self.toSquare(boxes);
+      boxes = self.clip(boxes);
+      total_boxes[b]  = boxes;
+    #third stage
+    for b in tf.range(len(total_boxes)):
+      boxes = total_boxes[b];
+      img = inputs[b:b+1,...];
+      # crop target and resize
+      target_imgs = tf.image.crop_and_resize(img, boxes[...,0:4], tf.zeros((boxes.shape[0]), dtype = tf.int32), (48,48));
+      target imgs = (target_imgs - 127.5) / 128;
+      probs, outputs1, outputs2 = self.onet(target_imgs);
+      valid_indices = tf.where(tf.math.greater(probs[...,1], self.threshold[2]));
+      boxes = tf.gather_nd(boxes, valid_indices);
+      scores = tf.gather_nd(probs[...,1], valid_indices);
+      outputs1 = tf.gather_nd(outputs1, valid_indices);
+      outputs2 = tf.gather_nd(outputs2, valid_indices);
+      total_boxes[b] = (tf.concat([boxes[..., 0:4], scores], axis = -1), outputs1);
 
 if __name__ == "__main__":
 
