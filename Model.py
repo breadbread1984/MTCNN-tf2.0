@@ -174,7 +174,8 @@ class MTCNN(tf.keras.Model):
       scales.append(scale);
       scale = scale * self.factor;
       m = m * self.factor;
-    # first stage
+    # 1)first stage
+    # nms among targets of the same scale.
     total_boxes = [tf.zeros((0,9), dtype = tf.float32) for i in tf.range(imgs.shape[0])];
     for scale in scales:
       sz = tf.math.ceil(inputs.shape[1:3] * scale);
@@ -187,9 +188,9 @@ class MTCNN(tf.keras.Model):
         boxes = boxes_batch[b];
         indices = indices_batch[b];
         total_boxes[b] = tf.concat([total_boxes[b], tf.gather(boxes, indices)], axis = 0);
-    # second stage
+    # nms among targets of different scales.
     indices_batch = self.nms(total_boxes, 0.7, 'union');
-    for b in tf.range(indices_batch.shape[0]):
+    for b in tf.range(len(total_boxes)):
       boxes = total_boxes[b];
       indices = indices_batch[b];
       boxes = tf.gather(boxes, indices);
@@ -201,10 +202,18 @@ class MTCNN(tf.keras.Model):
       # from rectangle bounding to square bounding
       bounding = self.toSquare(bounding);
       # clip the bounding within image
-      bounding = self.clip(bounding);
+      bounding = self.clip(bounding, inputs.shape);
       # total_boxes.shape = batch * (target number, 5)
       total_boxes[b] = bounding;
-    # TODO
+    # second stage
+    for b in tf.range(len(total_boxes)):
+      # boxes.shape = (target num, 5)
+      boxes = total_boxes[b];
+      img = inputs[b:b+1,...];
+      # crop target and resize
+      target_imgs = tf.image.crop_and_resize(img, boxes[...,0:4], tf.zeros((boxes.shape[0]), dtype = tf.int32), (24,24));
+      target_imgs = (target_imgs - 127.5) / 128;
+      probs, outputs = self.rnet(target_imgs);
 
 if __name__ == "__main__":
 
