@@ -193,7 +193,7 @@ class MTCNN(tf.keras.Model):
     for b in tf.range(len(total_boxes)):
       boxes = total_boxes[b];
       indices = indices_batch[b];
-      boxes = tf.gather(boxes, indices);
+      boxes = tf.gather_nd(boxes, indices);
       # hw.shape = (target number, 2)
       hw = boxes[..., 2:4] - boxes[..., 0:2];
       # bounding.shape = (target number, 4 (bounding) + 1 (objectness))
@@ -214,6 +214,15 @@ class MTCNN(tf.keras.Model):
       target_imgs = tf.image.crop_and_resize(img, boxes[...,0:4], tf.zeros((boxes.shape[0]), dtype = tf.int32), (24,24));
       target_imgs = (target_imgs - 127.5) / 128;
       probs, outputs = self.rnet(target_imgs);
+      valid_indices = tf.where(tf.math.greater(probs[...,1], self.threshold[1]));
+      boxes = tf.gather_nd(boxes, valid_indices);
+      scores = tf.gather_nd(probs[...,1], valid_indices);
+      total_boxes[b] = tf.concat([boxes[..., 0:4], scores], axis = -1);
+    indices_batch = self.nms(total_boxes, 0.7, 'union');
+    for b in tf.range(len(total_boxes)):
+      boxes = total_boxes[b];
+      indices = indices_batch[b];
+      boxes = tf.gather_nd(boxes, indices);
 
 if __name__ == "__main__":
 
