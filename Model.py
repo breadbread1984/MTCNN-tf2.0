@@ -140,6 +140,29 @@ class MTCNN(tf.keras.Model):
       indices_batch.append(descend_idx);
     return indices_batch;
 
+  def toSquare(self, total_boxes):
+
+    # hw.shape = (target num, 2)
+    hw = total_boxes[..., 2:4] - total_boxes[..., 0:2];
+    # length.shape = (target num)
+    length = tf.math.reduce_max(hw, axis = -1);
+    # center.shape = (target num, 2)
+    center = total_boxes[..., 0:2] + hw * 0.5;
+    # shape = (target num, 2)
+    upper_left = center - tf.stack([length, length], axis = -1) * 0.5;
+    down_right = upper_left + tf.stack([length, length], axis = -1);
+    total_boxes = tf.concat([upper_left, down_right, total_boxes[...,4:5]], axis = -1);
+    return total_boxes;
+
+  def clip(self, total_boxes, input_shape):
+
+    boxes = total_boxes[...,0:4];
+    lower = tf.constant([1, 1, 1, 1], dtype = tf.float32);
+    upper = tf.cast(tf.concat([input_shape[1:3], input_shape[1:3]], axis = -1), dtype = tf.float32);
+    boxes = tf.clip_by_value(boxes,lower,upper);
+    total_boxes = tf.concat([boxes, total_boxes[...,4:5]], axis = -1);
+    return total_boxes;
+
   def call(self, inputs):
 
     imgs = tf.cast(inputs, dtype = tf.float32);
@@ -175,7 +198,11 @@ class MTCNN(tf.keras.Model):
       # bounding.shape = (target number, 4 (bounding) + 1 (objectness))
       bounding = boxes[...., 0:4] + tf.concat([hw[..., 0:2],hw[..., 0:2]],axis = -1) * boxes[..., 5:9];
       bounding = tf.concat([bounding, boxes[..., 4]], axis = -1);
-      # refined_total_boxes.shape = batch * (target number, 5)
+      # from rectangle bounding to square bounding
+      bounding = self.toSquare(bounding);
+      # clip the bounding within image
+      bounding = self.clip(bounding);
+      # total_boxes.shape = batch * (target number, 5)
       total_boxes[b] = bounding;
     # TODO
 
