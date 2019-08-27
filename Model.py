@@ -10,8 +10,8 @@ def PNet():
   results = tf.keras.layers.Conv2D(filters = 16, kernel_size = (3,3), padding = 'valid', activation = tf.keras.layers.LeakyReLU())(results);
   results = tf.keras.layers.Conv2D(filters = 32, kernel_size = (3,3), padding = 'valid', activation = tf.keras.layers.LeakyReLU())(results);
   probs = tf.keras.layers.Conv2D(filters = 2, kernel_size = (1,1), padding = 'same', activation = tf.keras.layers.Softmax())(results);
-  outputs = tf.keras.layers.Conv2D(filters = 4, kernel_size = (1,1), padding = 'same')(results);
-  return tf.keras.Model(inputs = inputs, outputs = (probs, outputs));
+  deviations = tf.keras.layers.Conv2D(filters = 4, kernel_size = (1,1), padding = 'same')(results);
+  return tf.keras.Model(inputs = inputs, outputs = (probs, deviations));
 
 def RNet():
 
@@ -24,8 +24,8 @@ def RNet():
   results = tf.keras.layers.Flatten()(results);
   results = tf.keras.layers.Dense(units = 128, activation = tf.keras.layers.LeakyReLU())(results);
   probs = tf.keras.layers.Dense(units = 2, activation = tf.keras.layers.Softmax())(results);
-  outputs = tf.keras.layers.Dense(units = 4)(results);
-  return tf.keras.Model(inputs = inputs, outputs = (probs, outputs));
+  deviations = tf.keras.layers.Dense(units = 4)(results);
+  return tf.keras.Model(inputs = inputs, outputs = (probs, deviations));
 
 def ONet():
 
@@ -40,9 +40,9 @@ def ONet():
   results = tf.keras.layers.Flatten()(results);
   results = tf.keras.layers.Dense(units = 256, activation = tf.keras.layers.LeakyReLU())(results);
   probs = tf.keras.layers.Dense(units = 2, activation = tf.keras.layers.Softmax())(results);
-  outputs1 = tf.keras.layers.Dense(units = 4)(results);
-  outputs2 = tf.keras.layers.Dense(units = 10)(results);
-  return tf.keras.Model(inputs = inputs, outputs = (probs, outputs1, outputs2));
+  deviations = tf.keras.layers.Dense(units = 4)(results);
+  points = tf.keras.layers.Dense(units = 10)(results);
+  return tf.keras.Model(inputs = inputs, outputs = (probs, deviations, points));
 
 class MTCNN(tf.keras.Model):
 
@@ -65,7 +65,7 @@ class MTCNN(tf.keras.Model):
     self.threshold = threshold;
     self.factor = factor;
 
-  def getBBox(self, outputs, probs, scale):
+  def getBBox(self, deviations, probs, scale):
 
     boxes_batch = list();
     for b in tf.range(output.shape[0]):
@@ -81,7 +81,7 @@ class MTCNN(tf.keras.Model):
       score = tf.gather_nd(probs[b,...], pos);
       # pick the regressed deviation of targets over threshold
       # reg.shape = (target num, 4)
-      reg = tf.gather_nd(outputs[b,...], pos);
+      reg = tf.gather_nd(deviations[b,...], pos);
       # boxes.shape = (target num, 9)
       boxes = tf.concat([upper_left, down_right, tf.expand_dims(score, -1), reg], axis = -1);
       boxes_batch.append(boxes);
@@ -92,6 +92,7 @@ class MTCNN(tf.keras.Model):
 
     indices_batch = list();
     for boxes in boxes_batch:
+      if type(boxes) is tuple: boxes = boxes[0];
       down_right = boxes[...,2:4];
       upper_left = boxes[...,0:2];
       # hw.shape = (target num, 2)
@@ -163,10 +164,10 @@ class MTCNN(tf.keras.Model):
     total_boxes = tf.concat([boxes, total_boxes[...,4:5]], axis = -1);
     return total_boxes;
 
-  def applyDeviation(self, boxes, outputs):
+  def applyDeviation(self, boxes, deviations):
 
     hw = boxes[...,2:4] - boxes[...,0:2];
-    pos = boxes[...,0:4] + outputs * tf.concat([hw,hw], axis = -1);
+    pos = boxes[...,0:4] + deviations * tf.concat([hw,hw], axis = -1);
     boxes = tf.concat([pos, boxes[...,4:5]], axis = -1);
     return boxes;
 
@@ -187,9 +188,9 @@ class MTCNN(tf.keras.Model):
     for scale in scales:
       sz = tf.math.ceil(inputs.shape[1:3] * scale);
       imgs = (tf.image.resize(inputs, sz) - 127.5) / 128.0;
-      probs, outputs = self.pnet(imgs);
+      probs, deviations = self.pnet(imgs);
       # channel-1 of probs represents is a face.
-      boxes_batch = self.getBBox(outputs, probs[...,1], scale);
+      boxes_batch = self.getBBox(deviations, probs[...,1], scale);
       indices_batch = self.nms(boxes_batch, 0.5, 'union');
       for b in tf.range(boxes_batch.shape[0]):
         boxes = boxes_batch[b];
@@ -220,20 +221,20 @@ class MTCNN(tf.keras.Model):
       # crop target and resize
       target_imgs = tf.image.crop_and_resize(img, boxes[...,0:4], tf.zeros((boxes.shape[0]), dtype = tf.int32), (24,24));
       target_imgs = (target_imgs - 127.5) / 128;
-      probs, outputs = self.rnet(target_imgs);
+      probs, deviations = self.rnet(target_imgs);
       valid_indices = tf.where(tf.math.greater(probs[...,1], self.threshold[1]));
       boxes = tf.gather_nd(boxes, valid_indices);
-      scores = tf.gather_nd(probs[...,1], valid_indices);
-      outputs = tf.gather_nd(outputs, valid_indices);
-      total_boxes[b] = (tf.concat([boxes[..., 0:4], scores], axis = -1), outputs);
+      scores = tf.gather_nd(probs[...,1:2], valid_indices);
+      deviations = tf.gather_nd(deviations, valid_indices);
+      total_boxes[b] = (tf.concat([boxes[..., 0:4], scores], axis = -1), deviations);
     indices_batch = self.nms(total_boxes, 0.7, 'union');
     for b in tf.range(len(total_boxes)):
       boxes = total_boxes[b][0];
-      outputs = total_boxes[b][1];
+      deviations = total_boxes[b][1];
       indices = indices_batch[b];
       boxes = tf.gather_nd(boxes, indices);
-      outputs = tf.gather_nd(outputs, indices);
-      boxes = self.applyDeviation(boxes, outputs);
+      deviations = tf.gather_nd(deviations, indices);
+      boxes = self.applyDeviation(boxes, deviations);
       boxes = self.toSquare(boxes);
       boxes = self.clip(boxes);
       total_boxes[b]  = boxes;
@@ -243,14 +244,32 @@ class MTCNN(tf.keras.Model):
       img = inputs[b:b+1,...];
       # crop target and resize
       target_imgs = tf.image.crop_and_resize(img, boxes[...,0:4], tf.zeros((boxes.shape[0]), dtype = tf.int32), (48,48));
-      target imgs = (target_imgs - 127.5) / 128;
-      probs, outputs1, outputs2 = self.onet(target_imgs);
+      target_imgs = (target_imgs - 127.5) / 128;
+      probs, deviations, points = self.onet(target_imgs);
       valid_indices = tf.where(tf.math.greater(probs[...,1], self.threshold[2]));
       boxes = tf.gather_nd(boxes, valid_indices);
-      scores = tf.gather_nd(probs[...,1], valid_indices);
-      outputs1 = tf.gather_nd(outputs1, valid_indices);
-      outputs2 = tf.gather_nd(outputs2, valid_indices);
-      total_boxes[b] = (tf.concat([boxes[..., 0:4], scores], axis = -1), outputs1);
+      scores = tf.gather_nd(probs[...,1:2], valid_indices);
+      deviations = tf.gather_nd(deviations, valid_indices);
+      points = tf.gather_nd(points, valid_indices);
+      # convert points from relative coordinate to absolute coordinate
+      hw = boxes[...,2:4] - boxes[...,0:2];
+      # absolute coordinate.h = relative coordinate.h * h + upper_left.y
+      points[...,0:5] = hw[...,0:1] * points[...,0:5] + boxes[...,0:1] - 1;
+      # absolute coordinate.w = relative coordinate.w * w + upper_left.x
+      points[...,5:10] = hw[...,1:2] * points[...,5:10] + boxes[...,1:2] - 1;
+      total_boxes[b] = (tf.concat([boxes[..., 0:4], scores], axis = -1), deviations, points);
+    indices_batch = self.nms(total_boxes, 0.7, 'min');
+    for b in tf.range(len(total_boxes)):
+      boxes = total_boxes[b][0];
+      deviations = total_boxes[b][1];
+      points = total_boxes[b][2];
+      indices = indices_batch[b];
+      boxes = tf.gather_nd(boxes, indices);
+      deviations = tf.gather_nd(deviations, indices);
+      points = tf.gather_nd(points, indices);
+      boxes = self.applyDeviation(boxes, deviations);
+      total_boxes[b] = (boxes, points);
+    return total_boxes;
 
 if __name__ == "__main__":
 
