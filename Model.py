@@ -214,7 +214,8 @@ class MTCNN(tf.keras.Model):
       boxes = total_boxes[b];
       img = inputs[b:b+1,...];
       # crop target and resize
-      target_imgs = tf.image.crop_and_resize(img, boxes[...,0: 4], tf.zeros((boxes.shape[0]), dtype = tf.int32), (24, 24));
+      normalized_boxes = boxes[...,0:4] / tf.constant([img.shape[1] - 1, img.shape[2] - 1, img.shape[1] - 1, img.shape[2] - 1], dtype = tf.float32);
+      target_imgs = tf.image.crop_and_resize(img, normalized_boxes, tf.zeros((boxes.shape[0]), dtype = tf.int32), (24, 24));
       target_imgs = (target_imgs - 127.5) / 128.0;
       probs, deviations = self.rnet(target_imgs);
       valid_indices = tf.where(tf.math.greater(probs[...,1], self.threshold[1]));
@@ -238,6 +239,7 @@ class MTCNN(tf.keras.Model):
       boxes = total_boxes[b];
       img = inputs[b:b+1,...];
       # crop target and resize
+      normalized_boxes = boxes[...,0:4] / tf.constant([img.shape[1] - 1, img.shape[2] - 1, img.shape[1] - 1, img.shape[2] - 1], dtype = tf.float32);
       target_imgs = tf.image.crop_and_resize(img, boxes[...,0:4], tf.zeros((boxes.shape[0]), dtype = tf.int32), (48,48));
       target_imgs = (target_imgs - 127.5) / 128.0;
       probs, deviations, points = self.onet(target_imgs);
