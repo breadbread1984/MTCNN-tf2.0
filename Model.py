@@ -47,7 +47,7 @@ def ONet():
 class MTCNN(tf.keras.Model):
 
   STRIDE = 2.0;
-  CELLSIZE = 12.0;
+  CELLSIZE = 12.0; # PNET's perception scope size
 
   def __init__(self, minsize = 20, threshold = [0.6, 0.7, 0.7], factor = 0.709):
 
@@ -175,6 +175,7 @@ class MTCNN(tf.keras.Model):
 
     imgs = tf.cast(inputs, dtype = tf.float32);
     # generate image pyramid scales
+    # img size / target size * perception scope size = resized image size
     m = (self.CELLSIZE / self.minsize) * tf.math.reduce_min(inputs.shape[1:3]);
     scale = (self.CELLSIZE / self.minsize);
     scales = list();
