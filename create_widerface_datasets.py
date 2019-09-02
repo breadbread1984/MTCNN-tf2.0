@@ -59,9 +59,9 @@ def main(root_dir, input_file, output_file):
           trainsample = tf.train.Example(features = tf.train.Features(
             feature = {
               'data': tf.train.Feature(bytes_list = tf.train.BytesList(value = [img.tobytes()])),
-              'shape': tf.train.Feature(int64_list = tf.train.Int64List(value = img.shape[0:2])),
-              'objects': tf.train.Feature(int64_list = tf.train.Int64List(value = objs.ravel())),
-              'obj_num': tf.train.Feature(int64_list = tf.train.Int64List(value = [object_num]))
+              'shape': tf.train.Feature(int64_list = tf.train.Int64List(value = img.shape)),
+              'objects': tf.train.Feature(int64_list = tf.train.Int64List(value = objs.reshape(-1))),
+              'obj_num': tf.train.Feature(int64_list = tf.train.Int64List(value = [int(object_num)]))
             }
           ));
           writer.write(trainsample.SerializeToString());
@@ -73,5 +73,4 @@ if __name__ == "__main__":
 
   assert True == tf.executing_eagerly();
   main('WIDER_train', 'wider_face_split/wider_face_train_bbx_gt.txt', 'wider_face_train.tfrecord');
-  main('WIDER_test', 'wider_face_split/wider_face_test_filelist.txt', 'wider_face_test.tfrecord');
   main('WIDER_val', 'wider_face_split/wider_face_val_bbx_gt.txt', 'wider_face_val.tfrecord');
