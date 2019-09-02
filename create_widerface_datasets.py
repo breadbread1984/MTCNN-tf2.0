@@ -44,7 +44,18 @@ def main(root_dir, input_file, output_file):
       s = Status.Anno;
     elif s == Status.Anno:
       if object_num == 0:
-        # do nothing just consume the extra line
+        # image with no targets should write into dataset as well
+        img = cv2.imread(join(root_dir, 'images', img_path));
+        assert img is not None;
+        trainsample = tf.train.Example(features = tf.train.Features(
+          feature = {
+            'data': tf.train.Feature(bytes_list = tf.train.BytesList(value = [img.tobytes()])),
+            'shape': tf.train.Feature(int64_tlist = tf.train.Int64List(value = img.shape)),
+            'objects': tf.train.Feature(int64_list = tf.train.Int64List(value = [])),
+            'obj_num': tf.train.Feature(int64_list = tf.train.Int64List(value = [0]))
+          }
+        ));
+        writer.write(trainsample.SerializeToString());
         s = Status.Path;
       else:
         tokens = line.split(' ');
