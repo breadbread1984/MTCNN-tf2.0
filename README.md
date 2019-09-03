@@ -17,7 +17,9 @@ training MTCNN requires two datasets downloaded. One is Wider face. Another is C
 ### Download and convert Wider Face to tfrecord
 
 Download widerface [here](http://shuoyang1213.me/WIDERFACE/). And unzip the directorys
+
 >WIDER_train WIDER_val wider_face_split
+
 right under current directory.
 
 Then execute the following command to generate wider_face_train.tfrecord and wider_face_val.tfrecord.
