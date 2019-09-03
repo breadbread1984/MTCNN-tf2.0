@@ -10,16 +10,17 @@ def parse_widerface_function(serialized_example):
     serialized_example,
     features = {
       'data': tf.io.FixedLenFeature((), dtype = tf.string),
-      'shape': tf.io.FixedLenFeature((), dtype = tf.int64),
-      'objects': tf.io.FixedLenFeature((), dtype = tf.int64),
+      'shape': tf.io.FixedLenFeature((3,), dtype = tf.int64),
+      'objects': tf.io.VarLenFeature(dtype = tf.int64),
       'obj_num': tf.io.FixedLenFeature((), dtype = tf.int64)
     }
   );
-  shape = tf.reshape(feature['shape'], (3,));
+  shape = tf.cast(feature['shape'], dtype = tf.int32);
   data = tf.io.decode_raw(feature['data'], out_type = tf.uint8);
   data = tf.reshape(data, shape);
-  obj_num = tf.reshape(feature['obj_num'], ());
-  objects = tf.reshape(feature['objects'], (obj_num, 10));
+  obj_num = tf.cast(feature['obj_num'], dtype = tf.int32);
+  objects = tf.sparse.to_dense(feature['objects'], default_value = 0);
+  objects = tf.reshape(objects, (obj_num, 10));
   return data, objects;
 
 def main():

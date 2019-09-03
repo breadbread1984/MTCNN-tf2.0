@@ -72,7 +72,7 @@ def main(root_dir, input_file, output_file):
               'data': tf.train.Feature(bytes_list = tf.train.BytesList(value = [img.tobytes()])),
               'shape': tf.train.Feature(int64_list = tf.train.Int64List(value = list(img.shape))),
               'objects': tf.train.Feature(int64_list = tf.train.Int64List(value = objs.reshape(-1))),
-              'obj_num': tf.train.Feature(int64_list = tf.train.Int64List(value = [int(object_num)]))
+              'obj_num': tf.train.Feature(int64_list = tf.train.Int64List(value = [objs.shape[0]]))
             }
           ));
           writer.write(trainsample.SerializeToString());
