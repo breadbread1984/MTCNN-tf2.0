@@ -27,9 +27,13 @@ def main():
 
   widerface_trainset = tf.data.TFRecordDataset('wider_face_train.tfrecord').map(parse_widerface_function).batch(1);
   widerface_evalset = tf.data.TFRecordDataset('wider_face_val.tfrecord').map(parse_widerface_function).batch(1);
-  for data, objects in widerface_trainset:
+  for imgs, objects in widerface_trainset:
 
-    cv2.imshow('debug',data[0].numpy());
+    img = imgs[0].numpy();
+    labels = objects[0];
+    for obj in labels:
+      cv2.rectangle(img, (obj[0], obj[1]), (obj[0] + obj[2], obj[1] + obj[3]), (0,255,0), 5);
+    cv2.imshow('debug',img);
     cv2.waitKey();
 
 if __name__ == "__main__":

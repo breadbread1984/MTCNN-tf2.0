@@ -22,7 +22,7 @@ def main(root_dir, input_file, output_file):
   writer = tf.io.TFRecordWriter(output_file);
   if writer is None:
     print("invalid output file!");
-    exit(1)
+    exit(1);
   class Status(enum.Enum):
     Path = 0;
     Num = 1;
