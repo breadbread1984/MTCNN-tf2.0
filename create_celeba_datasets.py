@@ -39,7 +39,8 @@ def main(root_dir, input_file, output_file):
       # do nothing, just consume the line.
       s = Status.Anno;
     elif s == Status.Anno:
-      tokens = line.split(' ');
+      tokens = line.split();
+      assert len(tokens) == 11;
       img = cv2.imread(join(root_dir, tokens[0]));
       assert img is not None;
       landmarks = np.array([[int(tokens[1]), int(tokens[2])],
