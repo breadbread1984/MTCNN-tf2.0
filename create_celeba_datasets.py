@@ -56,7 +56,7 @@ def main(root_dir, input_file, output_file):
         }
       ));
       writer.write(trainsample.SerializeToString());
-      count--;
+      count -= 1;
       s = Status.Anno;
   assert count == 0;
   f.close();
