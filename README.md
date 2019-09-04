@@ -7,7 +7,7 @@ install prerequisite packages with the following command
 
 ```bash
 sudo apt install python-opencv
-pip3 install -U tf-nightly-gpu-2.0-preview tfds-nightly
+pip3 install -U tf-nightly-gpu-2.0-preview
 ```
 
 ## Download datasets
