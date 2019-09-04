@@ -37,7 +37,7 @@ def main(root_dir, input_file, output_file):
       s = Status.Head;
     elif s == Status.Head:
       # do nothing, just consume the line.
-      pass;
+      s = Status.Anno;
     elif s == Status.Anno:
       tokens = line.split(' ');
       img = cv2.imread(join(root_dir, tokens[0]));
