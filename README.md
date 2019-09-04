@@ -16,7 +16,7 @@ training MTCNN requires two datasets downloaded. One is Wider face. Another is C
 
 ### Download and convert Wider Face to tfrecord
 
-Download widerface [here](http://shuoyang1213.me/WIDERFACE/). And unzip the directorys
+Download widerface [here](http://shuoyang1213.me/WIDERFACE/). And unzip the directories
 
 >WIDER_train WIDER_val wider_face_split
 
@@ -29,7 +29,17 @@ python3 create_widerface_datasets.py
 
 ### Download and convert Celeb A to tfrecord
 
-execute the following command to generate celeba datasets.
+Download celebA [here](http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html). And unzip the directories
+
+>img_celeba
+
+and the landmark annotation file
+
+>list_landmarks_celeba.txt
+
+right under current directory.
+
+Then execute the following command to generate celeba datasets.
 ```bash
 python3 create_celeba_datasets.py
 ```
