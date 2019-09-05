@@ -92,7 +92,6 @@ class MTCNN(tf.keras.Model):
 
     indices_batch = list();
     for boxes in boxes_batch:
-      if type(boxes) is tuple: boxes = boxes[0];
       down_right = boxes[...,2:4];
       upper_left = boxes[...,0:2];
       # hw.shape = (target num, 2)
@@ -225,18 +224,18 @@ class MTCNN(tf.keras.Model):
       boxes = tf.gather(boxes, valid_indices);
       scores = tf.gather(probs[...,1:2], valid_indices);
       deviations = tf.gather(deviations, valid_indices);
-      total_boxes[b] = (tf.concat([boxes[..., 0:4], scores], axis = -1), deviations);
+      # NOTE: here the last dimension of boxes become 9 again.
+      total_boxes[b] = tf.concat([boxes[..., 0:4], scores, deviations], axis = -1);
     indices_batch = self.nms(total_boxes, 0.7, 'union');
     for b in tf.range(len(total_boxes)):
-      boxes = total_boxes[b][0];
-      deviations = total_boxes[b][1];
+      boxes = total_boxes[b];
       indices = indices_batch[b];
       boxes = tf.gather(boxes, indices);
-      deviations = tf.gather(deviations, indices);
-      boxes = self.applyDeviation(boxes, deviations);
-      boxes = self.toSquare(boxes);
-      boxes = self.clip(boxes);
-      total_boxes[b]  = boxes;
+      # NOTE: apply deviation reduce the last dimension from 9 to 5
+      bounding = self.applyDeviation(boxes, boxes[..., 5:9]);
+      bounding = self.toSquare(bounding);
+      bounding = self.clip(bounding, inputs.shape);
+      total_boxes[b]  = bounding;
     # 3) third stage
     for b in tf.range(len(total_boxes)):
       boxes = total_boxes[b];
