@@ -157,9 +157,11 @@ class MTCNN(tf.keras.Model):
 
   def clip(self, total_boxes, input_shape):
 
-    boxes = total_boxes[...,0:4];
-    lower = tf.constant([1, 1, 1, 1], dtype = tf.float32);
-    upper = tf.cast(tf.concat([input_shape[1:3], input_shape[1:3]], axis = -1), dtype = tf.float32);
+    boxes = total_boxes[...,0:4]; # (upper_left_y, upper_left_x, down_right_y, down_right_x)
+    min_yx = tf.constant([1, 1], dtype = tf.float32); # (1, 1)
+    max_yx = input_shape[1:3] - 1; # (height - 1, width - 1)
+    lower = tf.concat([min_yx, min_yx], axis = -1);
+    upper = tf.concat([max_yx, max_yx], axis = -1);
     boxes = tf.clip_by_value(boxes,lower,upper);
     total_boxes = tf.concat([boxes, total_boxes[...,4:5]], axis = -1);
     return total_boxes;
