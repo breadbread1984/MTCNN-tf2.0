@@ -256,16 +256,17 @@ class MTCNN(tf.keras.Model):
       points[...,0:5] = hw[...,0:1] * points[...,0:5] + boxes[...,0:1] - 1;
       # absolute coordinate.w = relative coordinate.w * w + upper_left.x
       points[...,5:10] = hw[...,1:2] * points[...,5:10] + boxes[...,1:2] - 1;
+      # NOTE: apply deviation before nms
       boxes = self.applyDeviation(boxes, deviations);
-      total_boxes[b] = (tf.concat([boxes[..., 0:4], scores], axis = -1), points);
+      # NOTE: here the last dimension of boxes become 15.
+      total_boxes[b] = tf.concat([boxes[..., 0:4], scores, points], axis = -1);
     indices_batch = self.nms(total_boxes, 0.7, 'min');
     for b in tf.range(len(total_boxes)):
-      boxes = total_boxes[b][0];
-      points = total_boxes[b][1];
+      boxes = total_boxes[b];
       indices = indices_batch[b];
-      boxes = tf.gather_nd(boxes, indices);
-      points = tf.gather_nd(points, indices);
-      total_boxes[b] = (boxes, points);
+      boxes = tf.gather(boxes, indices);
+      total_boxes[b] = boxes;
+    # total_boxes.shape = batch * (target number, 4 (bounding) + 1 (weight) + 10 (landmarks))
     return total_boxes;
 
 if __name__ == "__main__":
