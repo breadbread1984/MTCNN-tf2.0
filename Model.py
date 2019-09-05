@@ -122,7 +122,7 @@ class MTCNN(tf.keras.Model):
         # intersect_hw.shape = (following number, 2)
         # negative means no intersection.
         max_upper_left = tf.math.maximum(cur_upper_left, following_upper_left);
-        min_down_right = tf.math.minimum(cur_upper_left, following_down_right);
+        min_down_right = tf.math.minimum(cur_down_right, following_down_right);
         intersect_hw = min_down_right - max_upper_left + tf.ones((1, 2), dtype = tf.float32);
         # intersect_area.shape = (following number)
         intersect_hw = tf.where(tf.math.greater(intersect_hw, 0), intersect_hw, tf.zeros_like(intersect_hw));
