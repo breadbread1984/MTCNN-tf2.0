@@ -205,6 +205,7 @@ class MTCNN(tf.keras.Model):
       boxes = total_boxes[b];
       indices = indices_batch[b];
       boxes = tf.gather(boxes, indices);
+      # NOTE: apply deviation reduce the last dimension from 9 to 5
       bounding = self.applyDeviation(boxes, boxes[..., 5:9]);
       bounding = self.toSquare(bounding);
       bounding = self.clip(bounding, inputs.shape);
