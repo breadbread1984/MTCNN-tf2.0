@@ -51,7 +51,7 @@ def main(root_dir, input_file, output_file):
       # landmarks = np.flip(landmarks, axis = 1);
       trainsample = tf.train.Example(features = tf.train.Features(
         feature = {
-          'data': tf.train.Feature(bytes_list = tf.train.BytesList(value = [tf.image.encode_png(img).numpy()])),
+          'data': tf.train.Feature(bytes_list = tf.train.BytesList(value = [tf.io.encode_jpeg(img).numpy()])),
           'shape': tf.train.Feature(int64_list = tf.train.Int64List(value = list(img.shape))),
           'landmarks': tf.train.Feature(int64_list = tf.train.Int64List(value = landmarks.reshape(-1)))
         }

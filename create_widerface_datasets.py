@@ -69,7 +69,7 @@ def main(root_dir, input_file, output_file):
           assert img is not None;
           trainsample = tf.train.Example(features = tf.train.Features(
             feature = {
-              'data': tf.train.Feature(bytes_list = tf.train.BytesList(value = [tf.image.encode_png(img).numpy()])),
+              'data': tf.train.Feature(bytes_list = tf.train.BytesList(value = [tf.io.encode_jpeg(img).numpy()])),
               'shape': tf.train.Feature(int64_list = tf.train.Int64List(value = list(img.shape))),
               'objects': tf.train.Feature(int64_list = tf.train.Int64List(value = objs.reshape(-1))),
               'obj_num': tf.train.Feature(int64_list = tf.train.Int64List(value = [objs.shape[0]]))

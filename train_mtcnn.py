@@ -16,7 +16,7 @@ def parse_widerface_function(serialized_example):
     }
   );
   shape = tf.cast(feature['shape'], dtype = tf.int32);
-  data = tf.io.decode_png(feature['data']);
+  data = tf.io.decode_jpeg(feature['data']);
   data = tf.reshape(data, shape);
   obj_num = tf.cast(feature['obj_num'], dtype = tf.int32);
   objects = tf.sparse.to_dense(feature['objects'], default_value = 0);
@@ -34,7 +34,7 @@ def parse_celeba_function(serialized_example):
     }
   );
   shape = tf.cast(feature['shape'], dtype = tf.int32);
-  data = tf.io.decode_png(feature['data'], out_type = tf.uint8);
+  data = tf.io.decode_jpeg(feature['data']);
   data = tf.reshape(data, shape);
   landmarks = tf.cast(feature['landmarks'], dtype = tf.int32);
   return data, landmarks;
