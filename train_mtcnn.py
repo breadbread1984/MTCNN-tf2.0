@@ -41,16 +41,16 @@ def parse_celeba_function(serialized_example):
 
 def main():
 
-  widerface_trainset = tf.data.TFRecordDataset('wider_face_train.tfrecord').map(parse_widerface_function).batch(1);
-  celeba_trainset = tf.data.TFRecordDataset('celeba_train.tfrecord').map(parse_celeba_function).batch(1);
-  for imgs, objects in widerface_trainset:
+  widerface_trainset = tf.data.TFRecordDataset('wider_face_train.tfrecord').map(parse_widerface_function).batch(1).__iter__();
+  celeba_trainset = tf.data.TFRecordDataset('celeba_train.tfrecord').map(parse_celeba_function).batch(1).__iter__();
+  while True:
+    # train facial locater
+    for i in range(10):
+      imgs, objects = next(widerface_trainset);
 
-    img = imgs[0].numpy();
-    labels = objects[0];
-    for obj in labels:
-      cv2.rectangle(img, (obj[0], obj[1]), (obj[0] + obj[2], obj[1] + obj[3]), (0,255,0), 5);
-    cv2.imshow('debug',img);
-    cv2.waitKey();
+    # train facial landmarker
+    for i in range(10):
+      imgs, landmarkers = next(celeba_trainset);
 
 if __name__ == "__main__":
 
