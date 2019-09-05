@@ -110,7 +110,7 @@ class MTCNN(tf.keras.Model):
         cur_down_right = down_right[idx:idx + 1, ...];
         # area.shape = (1,)
         hw = cur_down_right - cur_upper_left + tf.ones((1, 2,), dtype = tf.float32);
-        area = hw[0] * hw[1];
+        area = hw[..., 0] * hw[..., 1];
         # following_idx.shape = (following number, 1)
         following_idx = descend_idx[i + 1:];
         # following_xxx.shape = (following number, 2)
@@ -118,7 +118,7 @@ class MTCNN(tf.keras.Model):
         following_down_right = tf.gather(down_right, following_idx);
         # following_area.shape = (following number,)
         following_hw = following_down_right - following_upper_left + tf.ones((1, 2,), dtype = tf.float32);
-        following_area = following_hw[0] * following_hw[1];
+        following_area = following_hw[..., 0] * following_hw[..., 1];
         # intersect_hw.shape = (following number, 2)
         # negative means no intersection.
         max_upper_left = tf.math.maximum(cur_upper_left, following_upper_left);
